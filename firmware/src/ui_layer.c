@@ -544,41 +544,41 @@ static uint32_t eqa_drum_on(const track_t *t, uint32_t l) { return !((drum_mute[
 #define EQA_LANE(l) {LK_SET, EQ_SHOW_MUTE, l, drum_lane_abbr, eqa_drum_mute, eqa_drum_on}
 static const eqa_t EQA_DRUM[NLANE] = {EQA_LANE(0), EQA_LANE(1), EQA_LANE(2), EQA_LANE(3), EQA_LANE(4), EQA_LANE(5),
     EQA_LANE(6), EQA_LANE(7)};
-/*   FM6   1 CHS: CHAOS on / off for the track (ui_fm6op.c fop_chaos: the operator pages' knobs roll the whole patch),
- *         lit = on; 2 RLL: roll the patch once now, on any page */
-static const char *eqa_fm6_name(const track_t *t, uint32_t a)
+static const eqa_set_t EQA[] = {
+    {ENGI_DRUM, NLANE, EQA_DRUM},
+};
+/* CHAOS (noiz_magick), on every engine: the two keys after the engine's own (FM6 and most: 1 2; DRUM: 9 10).
+ * CHS (DRUM: CX): CHAOS on / off for the track (ui_fm6op.c fop_chaos: the knobs on the OPERATOR pages and on ENV, LFO, FX roll
+ * their area: ui_chaos.c), lit = on. RLL (DRUM: RL): one roll now (ui_chaos.c chaos_roll_here: the page's area, else all) */
+static const char *eqa_chaos_name(const track_t *t, uint32_t a)
 {
-    (void)t;
+    if (t->eng_req % NENGINES == ENGI_DRUM)          /* (ten cells: two letters fit, as the lanes'; CH is the hat) */
+        return a ? "RL" : "CX";
     return a ? "RLL" : "CHS";
 }
-static void eqa_fm6_act(track_t *t, uint32_t a, uint32_t down)
+static void eqa_chaos_act(track_t *t, uint32_t a, uint32_t down)
 {
     uint32_t k = trk_index(t) % NTRK;
     if (!down)
         return;
     if (a) {
-        fop_roll();
-        ui_say("CHAOS", " ROLL");
+        ui_say("ROLL ", chaos_roll_here());
         return;
     }
     fop_chaos ^= (uint8_t)(1u << k);
     ui_say("CHAOS", (fop_chaos >> k) & 1u ? " ON" : " OFF");
 }
-static uint32_t eqa_fm6_on(const track_t *t, uint32_t a)
+static uint32_t eqa_chaos_on(const track_t *t, uint32_t a)
 {
     return a ? 0u : (fop_chaos >> (trk_index(t) % NTRK)) & 1u;
 }
-static const eqa_t EQA_FM6[2] = {
-    {LK_SET, EQ_SHOW_SEL, 0, eqa_fm6_name, eqa_fm6_act, eqa_fm6_on},
-    {LK_SET, EQ_SHOW_SEL, 1, eqa_fm6_name, eqa_fm6_act, eqa_fm6_on},
+static const eqa_t EQA_CHAOS[2] = {
+    {LK_SET, EQ_SHOW_SEL, 0, eqa_chaos_name, eqa_chaos_act, eqa_chaos_on},
+    {LK_SET, EQ_SHOW_SEL, 1, eqa_chaos_name, eqa_chaos_act, eqa_chaos_on},
 };
-static const eqa_set_t EQA[] = {
-    {ENGI_DRUM, NLANE, EQA_DRUM},
-    {ENGI_FM6, 2, EQA_FM6},
-};
-typedef char eqa_fits[NLANE <= 11 ? 1 : -1];       /* (11 black keys) */
+typedef char eqa_fits[NLANE + 2 <= 11 ? 1 : -1];   /* (11 black keys) */
 
-static uint32_t eqa_count(const track_t *t)        /* the actions of t's engine (black keys 1..n) */
+static uint32_t eqa_own(const track_t *t)          /* the engine's own actions */
 {
     uint32_t i, e = t->eng_req % NENGINES;
     for (i = 0; i < NELEM(EQA); i++)
@@ -586,12 +586,18 @@ static uint32_t eqa_count(const track_t *t)        /* the actions of t's engine 
             return EQA[i].n;
     return 0;
 }
+static uint32_t eqa_count(const track_t *t)        /* the actions of t's engine (black keys 1..n) */
+{
+    return eqa_own(t) + 2u;
+}
 static const eqa_t *eqa_of(const track_t *t, uint32_t p)   /* black key p's (0 = F#3), 0 none */
 {
-    uint32_t i, e = t->eng_req % NENGINES;
+    uint32_t i, e = t->eng_req % NENGINES, n = eqa_own(t);
+    if (p >= n)
+        return p < n + 2u ? &EQA_CHAOS[p - n] : 0;
     for (i = 0; i < NELEM(EQA); i++)
         if (EQA[i].eng == e)
-            return p < EQA[i].n ? &EQA[i].a[p] : 0;
+            return &EQA[i].a[p];
     return 0;
 }
 /* black key k (its place p) pressed in the EDIT layer */

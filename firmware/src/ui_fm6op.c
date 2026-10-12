@@ -67,7 +67,15 @@ static void fop_write(uint32_t b, uint32_t v)
  * operators, the algorithm, feedback, the pitch envelope, the LFO and the transpose, each byte uniformly random over
  * its whole range (fm6_max), no weighting, no guardrails. Every detent is a new roll. A knob gesture is one undo (SAVE
  * held: the sound from before the gesture's first roll). CHAOS off: the knobs edit as before (fine-tune). */
-static uint8_t fop_chaos;                            /* bit tr: track tr's operator knobs roll the patch */
+static uint8_t fop_chaos;                            /* bit tr: CHAOS on for track tr (ui_chaos.c: ENV LFO FX too) */
+
+/* the moment of the turn into the random numbers: no two power-ons roll alike */
+static void chaos_seed(void)
+{
+    rng_state ^= fm1_ms * 2654435761u;
+    if (!rng_state)
+        rng_state = 0x1234567u;
+}
 
 static void fop_roll(void)
 {
@@ -75,9 +83,7 @@ static void fop_roll(void)
     uint32_t tr = song.sel % NTRK, b;
     track_t *t = TSEL;
     uint8_t p[FP_SIZE + 1u];
-    rng_state ^= fm1_ms * 2654435761u;               /* (when you turned it: no two power-ons roll alike) */
-    if (!rng_state)
-        rng_state = 0x1234567u;
+    chaos_seed();
     for (b = 0; b < FP_NAME; b++)
         p[b] = (uint8_t)(rng() % (fm6_max(b) + 1u));
     memcpy(p + FP_NAME, NAME, sizeof NAME);

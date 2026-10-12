@@ -995,6 +995,11 @@ static void edit_param(uint32_t slot, int32_t steps)
         fop_knob(slot, steps);
         return;
     }
+    if (chaos_on() && chaos_area(pg) != FAM_COUNT) {    /* CHAOS: any knob on ENV, LFO, FX rolls the area (ui_chaos.c) */
+        if (steps)
+            chaos_roll_area(chaos_area(pg), pg, 1);
+        return;
+    }
     if (pg->graph == GR_MOD && slot == 0u) {             /* MOD: KNOB 1 the slot, 2..4 its SRC DST AMT */
         mod_ui_slot = (uint8_t)clamp((int32_t)mod_ui_slot + (steps > 0 ? 1 : -1), 0, 3);
         return;
