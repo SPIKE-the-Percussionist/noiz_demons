@@ -544,8 +544,37 @@ static uint32_t eqa_drum_on(const track_t *t, uint32_t l) { return !((drum_mute[
 #define EQA_LANE(l) {LK_SET, EQ_SHOW_MUTE, l, drum_lane_abbr, eqa_drum_mute, eqa_drum_on}
 static const eqa_t EQA_DRUM[NLANE] = {EQA_LANE(0), EQA_LANE(1), EQA_LANE(2), EQA_LANE(3), EQA_LANE(4), EQA_LANE(5),
     EQA_LANE(6), EQA_LANE(7)};
+/*   FM6   1 CHS: CHAOS on / off for the track (ui_fm6op.c fop_chaos: the operator pages' knobs roll the whole patch),
+ *         lit = on; 2 RLL: roll the patch once now, on any page */
+static const char *eqa_fm6_name(const track_t *t, uint32_t a)
+{
+    (void)t;
+    return a ? "RLL" : "CHS";
+}
+static void eqa_fm6_act(track_t *t, uint32_t a, uint32_t down)
+{
+    uint32_t k = trk_index(t) % NTRK;
+    if (!down)
+        return;
+    if (a) {
+        fop_roll();
+        ui_say("CHAOS", " ROLL");
+        return;
+    }
+    fop_chaos ^= (uint8_t)(1u << k);
+    ui_say("CHAOS", (fop_chaos >> k) & 1u ? " ON" : " OFF");
+}
+static uint32_t eqa_fm6_on(const track_t *t, uint32_t a)
+{
+    return a ? 0u : (fop_chaos >> (trk_index(t) % NTRK)) & 1u;
+}
+static const eqa_t EQA_FM6[2] = {
+    {LK_SET, EQ_SHOW_SEL, 0, eqa_fm6_name, eqa_fm6_act, eqa_fm6_on},
+    {LK_SET, EQ_SHOW_SEL, 1, eqa_fm6_name, eqa_fm6_act, eqa_fm6_on},
+};
 static const eqa_set_t EQA[] = {
     {ENGI_DRUM, NLANE, EQA_DRUM},
+    {ENGI_FM6, 2, EQA_FM6},
 };
 typedef char eqa_fits[NLANE <= 11 ? 1 : -1];       /* (11 black keys) */
 

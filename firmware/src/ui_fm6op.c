@@ -62,6 +62,33 @@ static void fop_write(uint32_t b, uint32_t v)
     motion_undo_done(t);
 }
 
+/* CHAOS (FM6 quick actions: hold EDIT, black key 1 CHS toggles it, black key 2 RLL rolls once): with CHAOS on for the
+ * selected track, any knob on OPERATOR, OPERATOR 2 or OP ENV rolls the whole patch instead of editing one byte: all six
+ * operators, the algorithm, feedback, the pitch envelope, the LFO and the transpose, each byte uniformly random over
+ * its whole range (fm6_max), no weighting, no guardrails. Every detent is a new roll. A knob gesture is one undo (SAVE
+ * held: the sound from before the gesture's first roll). CHAOS off: the knobs edit as before (fine-tune). */
+static uint8_t fop_chaos;                            /* bit tr: track tr's operator knobs roll the patch */
+
+static void fop_roll(void)
+{
+    static const char NAME[10] = {'C', 'H', 'A', 'O', 'S', ' ', ' ', ' ', ' ', ' '};
+    uint32_t tr = song.sel % NTRK, b;
+    track_t *t = TSEL;
+    uint8_t p[FP_SIZE + 1u];
+    rng_state ^= fm1_ms * 2654435761u;               /* (when you turned it: no two power-ons roll alike) */
+    if (!rng_state)
+        rng_state = 0x1234567u;
+    for (b = 0; b < FP_NAME; b++)
+        p[b] = (uint8_t)(rng() % (fm6_max(b) + 1u));
+    memcpy(p + FP_NAME, NAME, sizeof NAME);
+    edit_undo_take(t, 0x2000u, UNDO_SOUND);          /* (one copy per gesture: same tag within 1.5 s) */
+    fm6_set_patch(tr, p);
+    fm6_own_ok &= (uint8_t)~(1u << tr);
+    fm6_slot[tr] = FM6_OWN;
+    t->p[P_E7] = FM6_OWN;
+    motion_undo_done(t);
+}
+
 /* KNOB slot turned by steps on an operator page */
 static void fop_knob(uint32_t slot, int32_t steps)
 {
@@ -69,6 +96,10 @@ static void fop_knob(uint32_t slot, int32_t steps)
     int32_t max;
     if (!fop_ok() || !steps)
         return;
+    if ((fop_chaos >> (song.sel % NTRK)) & 1u) {     /* CHAOS: every detent of any knob, a new patch */
+        fop_roll();
+        return;
+    }
     if (f == FO_OP) {
         fop_op = (uint8_t)clamp((int32_t)fop_op + steps, 0, 5);
         return;
