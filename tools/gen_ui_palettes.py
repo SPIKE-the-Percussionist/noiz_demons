@@ -49,6 +49,9 @@ PALETTES = [
     ("NIGHT",  (0, 0, 0),       (0, 24, 10),     (150, 230, 170), (56, 220, 100),  (255, 255, 255)),
     # 1.0.2: black and white (the derived tokens are set, not blended: bw()); the old MONO is GREY (id 0)
     ("MONO",   (0, 0, 0),       (0, 0, 0),       (255, 255, 255), (255, 255, 255), (255, 255, 255)),
+    # noiz_magick: a sinister dark theme. swampy green-black, poison-green values, a blood-red flash on the one
+    # active thing (hot knob, cursor, playhead)
+    ("VENOM",  (4, 6, 2),       (14, 24, 10),    (210, 224, 200), (150, 235, 70),  (255, 60, 80)),
 ]
 BW = "MONO"
 BW_GREY = (82, 82, 82)             # MONO's one mid grey (RGB565 10/20/10): DIM LINE RAISE LANE
