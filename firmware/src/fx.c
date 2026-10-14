@@ -901,6 +901,23 @@ static __attribute__((noinline)) void scope_take_mix(uint32_t n)
         scope_buf[scope_w++ & (SCOPE_N - 1u)] = (int16_t)clamp(mix_l[i] + wet[i], -32767, 32767);
 }
 
+/* GOETIA (ui_goetia.c goetia_level): the loudest sample of the mix before MASTER since the sigil last looked,
+ * always, whatever MENU > DISPLAY > SCOPE says; the same scale as SCOPE MIX */
+static volatile int32_t goetia_mix_peak;
+static __attribute__((noinline)) void goetia_take_mix(uint32_t n)
+{
+    uint32_t i;
+    int32_t pk = goetia_mix_peak, s;
+    for (i = 1; i < n; i += 2u) {
+        s = mix_l[i] + wet[i];
+        if (s < 0)
+            s = -s;
+        if (s > pk)
+            pk = s;
+    }
+    goetia_mix_peak = pk;
+}
+
 /* the master with the FX layer's effects between its level and master_out (perform.c) */
 static __attribute__((noinline)) void perf_master(int32_t *out, uint32_t n)
 {
@@ -937,6 +954,7 @@ static void mix_block(int32_t *out, uint32_t n)
         rev_side_mix(mix_l, mix_r, n);                  /* HALL: stereo */
     if (scope_mix)
         scope_take_mix(n);
+    goetia_take_mix(n);                                 /* the sigil's meter (ui_goetia.c): before MASTER, always */
     if (perf) {
         perf_master(out, n);
         return;

@@ -64,10 +64,10 @@ static void fop_write(uint32_t b, uint32_t v)
 
 /* CHAOS (FM6 quick actions: hold EDIT, black key 1 CHS toggles it, black key 2 RLL rolls once): with CHAOS on for the
  * selected track, any knob on OPERATOR, OPERATOR 2 or OP ENV rolls the whole patch instead of editing one byte: all six
- * operators, the algorithm, feedback, the pitch envelope, the LFO and the transpose, each byte uniformly random over
- * its whole range (fm6_max), no weighting, no guardrails. Every detent is a new roll. A knob gesture is one undo (SAVE
- * held: the sound from before the gesture's first roll). CHAOS off: the knobs edit as before (fine-tune). */
-static uint8_t fop_chaos;                            /* bit tr: CHAOS on for track tr (ui_chaos.c: ENV LFO FX too) */
+ * operators, the algorithm, feedback, the pitch envelope, the LFO and the transpose, each byte random around where it
+ * is, as far as the demon summoned allows (ui_goetia.c: a KING, its whole range, no guardrails). Every detent is a new
+ * roll. A knob gesture is one undo (SAVE held: the sound from before the gesture's first roll). CHAOS off: the knobs edit as before (fine-tune). */
+static uint8_t fop_chaos = 0xFFu;                            /* bit tr: CHAOS on for track tr (ui_chaos.c: ENV LFO FX too) */
 
 /* the moment of the turn into the random numbers: no two power-ons roll alike */
 static void chaos_seed(void)
@@ -77,15 +77,60 @@ static void chaos_seed(void)
         rng_state = 0x1234567u;
 }
 
+/* the summoning's guardrail (noiz_magick): no dead silence. OP 1 is a carrier in every algorithm (DX7-style: all
+ * 32 end in OP 1), so whatever else rolled, if OP 1 can sound the patch sounds. Only a byte below its floor is
+ * touched, and then to a random value between the floor and its top: faint, short and strange still come through,
+ * only "nothing at all" does not. Raise a floor for louder rescues, lower it for fewer */
+#define FOP_SAFE_LEVEL 70u                           /* OP 1's output level (0..99) */
+#define FOP_SAFE_PEAK  80u                           /* OP 1's envelope: the level the attack rises to (0..99) */
+#define FOP_SAFE_RATE  40u                           /* OP 1's envelope: the attack's rate (0..99; near 0 it never arrives) */
+static void fop_floor(uint8_t *p, uint32_t b, uint32_t lo)
+{
+    uint32_t hi = fm6_max(b);
+    if (lo > hi)
+        lo = hi;
+    if (p[b] < lo)
+        p[b] = (uint8_t)(lo + rng() % (hi - lo + 1u));
+}
+/* the summoning's pitch guard (noiz_magick): the keys always play notes. An operator on FIXED plays one frequency
+ * whatever key is pressed, so a carrier (an operator you hear directly) rolled to FIXED takes the keyboard away.
+ * Every carrier is put back on RATIO, which follows the keys; its rolled COARSE / FINE then read as a ratio. The
+ * modulators keep whatever mode they rolled: a FIXED modulator is the metallic, clangy colour, and the note still
+ * follows the keys. The carriers counted: those of the patch's own algorithm and, when EDIT's ALG picks another one,
+ * of that one too (turning ALG to a third algorithm afterwards can still bring a FIXED operator to the output) */
+static void fop_keys(uint8_t *p)
+{
+    int32_t e = TSEL->p[P_E0];                      /* ALG: PAT (0) = the patch's algorithm, 1..32 another */
+    uint32_t car = fm6_carriers(p[FP_ALG] & 31u), k;
+    if (e >= 1 && e <= 32)
+        car |= fm6_carriers((uint32_t)e - 1u);
+    for (k = 0; k < 6u; k++)                         /* (bit k: operator k, the sixth first, as the patch) */
+        if ((car >> k) & 1u)
+            p[k * FP_OP + FP_MODE] = 0;              /* RATIO */
+}
+
+static void fop_audible(uint8_t *p)
+{
+    uint32_t o = 5u * FP_OP;                         /* OP 1 (the patch holds OP 6 first) */
+    fop_floor(p, o + FP_OL, FOP_SAFE_LEVEL);
+    fop_floor(p, o + FP_R1, FOP_SAFE_RATE);
+    fop_floor(p, o + FP_L1, FOP_SAFE_PEAK);
+    if (p[o + FP_MODE] && (p[o + FP_FC] & 3u) < 2u)  /* FIXED at 1 or 10 HZ: below hearing -> 100 HZ */
+        p[o + FP_FC] = (uint8_t)((p[o + FP_FC] & ~3u) | 2u);
+}
+
 static void fop_roll(void)
 {
-    static const char NAME[10] = {'C', 'H', 'A', 'O', 'S', ' ', ' ', ' ', ' ', ' '};
+    static const char NAME[10] = {'S', 'U', 'M', 'M', 'O', 'N', 'E', 'D', ' ', ' '};
     uint32_t tr = song.sel % NTRK, b;
     track_t *t = TSEL;
     uint8_t p[FP_SIZE + 1u];
     chaos_seed();
+    goetia_summon();                                 /* GOETIA (ui_goetia.c): the demon's rank sets how far each byte moves */
     for (b = 0; b < FP_NAME; b++)
-        p[b] = (uint8_t)(rng() % (fm6_max(b) + 1u));
+        p[b] = (uint8_t)goetia_roll(fm6_patch[tr][b], 0, (int32_t)fm6_max(b));
+    fop_keys(p);                                     /* (the pitch guard: the carriers follow the keys) */
+    fop_audible(p);                                  /* (the guardrail: never a dead patch) */
     memcpy(p + FP_NAME, NAME, sizeof NAME);
     edit_undo_take(t, 0x2000u, UNDO_SOUND);          /* (one copy per gesture: same tag within 1.5 s) */
     fm6_set_patch(tr, p);

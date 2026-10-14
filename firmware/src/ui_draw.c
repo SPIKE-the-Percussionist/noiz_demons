@@ -1226,6 +1226,7 @@ static void draw_columns(void)
  * The square (176 x 176) is more than the canvas (CV_MAX, 240 x 124): it is filled straight on the screen and its
  * two text bands drawn on it as canvases, the top one from the square's top edge, the bottom one to its bottom edge.
  * In the saved palette (settings_init before it) */
+#if 0   /* noiz_magick: the stock Felucca card, replaced by the NOIZ DEMONS splash (ui_splash.c) */
 #define SPL_SQ 176                                  /* the square (even: centred exactly) */
 #define SPL_X0 ((240u - SPL_SQ) / 2u)               /* its top-left on the screen (x and y) */
 #define SPL_PAD 16                                  /* the text's inset: left (its ink), top and bottom (the capitals) */
@@ -1254,6 +1255,15 @@ static void draw_splash(void)
                 "splash maker's baseline SPL_PAD from the bottom");
     lcd_sync();
 }
+#else
+/* noiz_magick: power-on is a plain dark screen while the synth starts; the NOIZ DEMONS splash plays on the first
+ * frames after it (ui_splash.c nzd_frame) */
+static void draw_splash(void)
+{
+    lcd_fill(0, 0, 240, 240, T_BG);
+    lcd_sync();
+}
+#endif
 
 /* UPDATE MODE countdown (main.c: OCT- + OCT+ held): over everything, the menu and the dialogs too */
 static void draw_uboot(void)
@@ -1435,6 +1445,8 @@ static void style_apply(void)
     }
 }
 
+#include "ui_splash.c"                          /* noiz_magick: the NOIZ DEMONS boot splash */
+
 static void ui_draw_page(uint32_t counting);
 static void ui_draw(void)
 {
@@ -1447,6 +1459,10 @@ static void ui_draw(void)
     }
     if (!scr_frame())                                   /* MENU > SCREEN OFF: dark (or waking), nothing drawn */
         return;
+    if (nzd_frame()) {                                  /* noiz_magick: the boot splash, then the page */
+        scr_shown();
+        return;
+    }
     ui_draw_page(counting);
     scr_shown();
 }

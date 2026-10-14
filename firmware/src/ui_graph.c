@@ -12,6 +12,7 @@
 #define GOY 11                                       /* graphs drawn on a 100 px scale sit at y 11..111 */
 /* the height ADSR and LFO are drawn on: 100 px, or (MENU > LARGE's strip: draw_graph) the strip's ~ 56 */
 static int32_t graph_ht = 100;
+#include "ui_goetia.c"                               /* GOETIA: the demons CHAOS summons, their sigils (before ui_fm6op.c: fop_roll) */
 #include "ui_fm6op.c"                                /* EDIT > OPERATOR, OP ENV, OPERATOR 2: FM6's operators (their charts below) */
 #include "ui_chaos.c"                                /* CHAOS: ENV, LFO and FX rolled (after ui_fm6op.c: fop_chaos) */
 
@@ -1180,8 +1181,11 @@ static uint32_t graph_signature(void)
     const page_t *pg = cur_page();
     const track_t *t = TSEL;
     uint32_t h = 2166136261u, i;
+    h ^= goetia_sig();                               /* GOETIA: the sigil shown, glowing (ui_goetia.c) */
     if (ui.home)
         return h ^ (ui.frame / 2u);                  /* scope: redraw every other frame */
+    if (goetia_shown())
+        return h;
     h ^= (uint32_t)pg->graph * 131u + TSEL->eng_req + song.sel * 7777u + ui.page * 1291u;
     if (strip_kind() == SK_TITLE)                    /* MENU > LARGE: the page's title (its engine, its number) */
         return h ^ 0x5A17u;
@@ -2241,7 +2245,9 @@ static void draw_graph(void)
     cv_rrect(3, 0, 234, graph_h(), 5, T_SURF, T_BG);   /* the panel (MENU > LARGE: the strip) */
     cv_bg = T_SURF;                                  /* (text drawn with cv_text lands on it) */
     cv_oy = GOY;                                     /* graphs on a 100 px scale */
-    if (strip_kind() != SK_NONE) {                   /* MENU > LARGE: the strip */
+    if (goetia_shown()) {                            /* GOETIA: the demon summoned, over the page's graph (ui_goetia.c) */
+        graph_goetia(graph_h());
+    } else if (strip_kind() != SK_NONE) {            /* MENU > LARGE: the strip */
         uint32_t k = strip_kind();
         cv_oy = k == SK_ADSR || k == SK_LFO ? 3 : 0;
         graph_ht = LG_H_GRAPH - 6;

@@ -548,35 +548,41 @@ static const eqa_set_t EQA[] = {
     {ENGI_DRUM, NLANE, EQA_DRUM},
 };
 /* CHAOS (noiz_magick), on every engine: the two keys after the engine's own (FM6 and most: 1 2; DRUM: 9 10).
- * CHS (DRUM: CX): CHAOS on / off for the track (ui_fm6op.c fop_chaos: the knobs on the OPERATOR pages and on ENV, LFO, FX roll
+ * CHS (DRUM: CX): CHAOS on / off for the track (key 1; RLL is key 3, a blank gap between so a stray press near
+ * CHS can't toggle chaos) (ui_fm6op.c fop_chaos: the knobs on the OPERATOR pages and on ENV, LFO, FX roll
  * their area: ui_chaos.c), lit = on. RLL (DRUM: RL): one roll now (ui_chaos.c chaos_roll_here: the page's area, else all) */
+/* 3 cells: CHS (key 1), a blank gap (key 2), RLL (key 3), so a stray press near CHS can't toggle chaos. a: 0 CHS,
+ * 2 RLL (1 is the gap: no name, no action) */
 static const char *eqa_chaos_name(const track_t *t, uint32_t a)
 {
-    if (t->eng_req % NENGINES == ENGI_DRUM)          /* (ten cells: two letters fit, as the lanes'; CH is the hat) */
+    if (a == 1u)                                     /* the gap between CHS and RLL */
+        return "";
+    if (t->eng_req % NENGINES == ENGI_DRUM)          /* (12 cells: two letters fit, as the lanes'; CH is the hat) */
         return a ? "RL" : "CX";
-    return a ? "RLL" : "CHS";
+    return a ? "SUM" : "RIT";
 }
 static void eqa_chaos_act(track_t *t, uint32_t a, uint32_t down)
 {
     uint32_t k = trk_index(t) % NTRK;
-    if (!down)
+    if (!down || a == 1u)                            /* the gap does nothing */
         return;
     if (a) {
-        ui_say("ROLL ", chaos_roll_here());
+        if ((fop_chaos >> (song.sel % NTRK)) & 1u) ui_say("SUMMONING ", chaos_roll_here()); else ui_say("RITUAL", " OFF");
         return;
     }
     fop_chaos ^= (uint8_t)(1u << k);
-    ui_say("CHAOS", (fop_chaos >> k) & 1u ? " ON" : " OFF");
+    ui_say("RITUAL", (fop_chaos >> k) & 1u ? " ON" : " OFF");
 }
 static uint32_t eqa_chaos_on(const track_t *t, uint32_t a)
 {
-    return a ? 0u : (fop_chaos >> (trk_index(t) % NTRK)) & 1u;
+    return a == 0u ? (fop_chaos >> (trk_index(t) % NTRK)) & 1u : 0u;
 }
-static const eqa_t EQA_CHAOS[2] = {
+static const eqa_t EQA_CHAOS[3] = {
     {LK_SET, EQ_SHOW_SEL, 0, eqa_chaos_name, eqa_chaos_act, eqa_chaos_on},
     {LK_SET, EQ_SHOW_SEL, 1, eqa_chaos_name, eqa_chaos_act, eqa_chaos_on},
+    {LK_SET, EQ_SHOW_SEL, 2, eqa_chaos_name, eqa_chaos_act, eqa_chaos_on},
 };
-typedef char eqa_fits[NLANE + 2 <= 11 ? 1 : -1];   /* (11 black keys) */
+typedef char eqa_fits[NLANE + 3 <= 11 ? 1 : -1];   /* (11 black keys) */
 
 static uint32_t eqa_own(const track_t *t)          /* the engine's own actions */
 {
@@ -588,13 +594,13 @@ static uint32_t eqa_own(const track_t *t)          /* the engine's own actions *
 }
 static uint32_t eqa_count(const track_t *t)        /* the actions of t's engine (black keys 1..n) */
 {
-    return eqa_own(t) + 2u;
+    return eqa_own(t) + 3u;
 }
 static const eqa_t *eqa_of(const track_t *t, uint32_t p)   /* black key p's (0 = F#3), 0 none */
 {
     uint32_t i, e = t->eng_req % NENGINES, n = eqa_own(t);
     if (p >= n)
-        return p < n + 2u ? &EQA_CHAOS[p - n] : 0;
+        return p < n + 3u ? &EQA_CHAOS[p - n] : 0;
     for (i = 0; i < NELEM(EQA); i++)
         if (EQA[i].eng == e)
             return &EQA[i].a[p];
