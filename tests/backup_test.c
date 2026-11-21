@@ -198,9 +198,9 @@ int main(void)
     ps.palette = palette_to_stored(6);
     bad += check("settings with SPEAKER BASS+ restore", put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 &&
                  settings.lowcut == 2u && fx_lowcut == 2u && settings.palette == 6u);
-    ps.palette = 13;                                     /* an older backup: its PAPER (old id 13) */
+    ps.palette = 13;                                     /* an older (stock Felucca) backup: NOIZ DEMONS' VENOM */
     bad += check("settings of an older backup restore with the palette migrated",
-                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings.palette == 6u);
+                 put_all(1, &ps, sizeof ps, st_crc32(&ps, sizeof ps)) == 0 && settings.palette == UI_VENOM_INDEX);
     ps.palette = palette_to_stored(6);
     before = erases;
     ps.lowcut = 3;

@@ -158,14 +158,22 @@ static void palette_set(uint32_t i)
     ux.gen++;                                    /* the text ramps change with the coverage curve */
 }
 
-/* settings store a tagged id; ids below 20 are the palettes of earlier firmware */
+/* settings store a tagged id; ids below 20 are the palettes of earlier firmware.
+ * NOIZ DEMONS saves its palette under its own tag (NZ_PAL_TAG). A palette saved by stock Felucca (UI_PAL_TAG, or an
+ * old id) or no saved palette at all means NOIZ DEMONS hasn't run here yet: VENOM. Stock Felucca shares this settings
+ * block, so without this a unit that ran Felucca first came up in Felucca's GREY default. Once a COLOR is picked in
+ * NOIZ DEMONS it is saved under NZ_PAL_TAG and kept. (Stock Felucca reads an NZ id as unknown: its GREY.) */
+#define NZ_PAL_TAG 96u
 static uint32_t palette_from_stored(uint32_t v)
 {
-    if (v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES) return v - UI_PAL_TAG;
-    return v < 20u ? UI_PALETTE_MIGRATE[v] : UI_GREY_INDEX;
+    if (v >= NZ_PAL_TAG && v - NZ_PAL_TAG < NPALETTES) return v - NZ_PAL_TAG;
+    return UI_VENOM_INDEX;
 }
-static uint32_t palette_to_stored(uint32_t i) { return UI_PAL_TAG + i % NPALETTES; }
-static int palette_stored_ok(uint32_t v) { return v < 20u || (v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES); }
+static uint32_t palette_to_stored(uint32_t i) { return NZ_PAL_TAG + i % NPALETTES; }
+static int palette_stored_ok(uint32_t v)
+{
+    return v < 20u || (v >= UI_PAL_TAG && v - UI_PAL_TAG < NPALETTES) || (v >= NZ_PAL_TAG && v - NZ_PAL_TAG < NPALETTES);
+}
 
 static inline uint16_t swap16(uint32_t c) { return (uint16_t)(((c >> 8) & 0xFFu) | ((c & 0xFFu) << 8)); }
 

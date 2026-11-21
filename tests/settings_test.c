@@ -34,23 +34,27 @@ int main(void)
     original.favorites.user = 1u << 31; original.favorites.filter = 1;
     p = original;
     assert(settings_import(&p, sizeof p) == 1); settings_init();
-    assert(settings.palette == UI_GREY_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);
-    assert(p.palette == palette_to_stored(UI_GREY_INDEX));        /* migrated in place */
-    {   /* every old id maps to a palette; tagged ids round trip; anything else is GREY */
+    /* NOIZ DEMONS: a palette saved by stock Felucca (an old id, or UI_PAL_TAG) comes up VENOM */
+    assert(settings.palette == UI_VENOM_INDEX && fx_lowcut && settings.zoom && panel.enc[0] == 3);
+    assert(p.palette == palette_to_stored(UI_VENOM_INDEX));       /* migrated in place */
+    {   /* old ids, Felucca's tagged ids and anything unknown are VENOM; NOIZ DEMONS' own ids round trip */
         persist_t q = original;
-        for (uint32_t i = 0; i < 20u; i++) assert(palette_from_stored(i) < NPALETTES);
-        assert(palette_from_stored(13) == 6u && palette_from_stored(11) == 7u && palette_from_stored(19) == 7u);
+        for (uint32_t i = 0; i < 20u; i++) assert(palette_from_stored(i) == UI_VENOM_INDEX);
         for (uint32_t i = 0; i < NPALETTES; i++) assert(palette_from_stored(palette_to_stored(i)) == i);
-        assert(palette_from_stored(40) == UI_GREY_INDEX && !palette_stored_ok(40) && palette_stored_ok(3));
-        /* 1.0.2: the old MONO keeps its id as GREY (a saved MONO looks the same); the new black and white MONO is
-         * appended, a new id */
-        assert(palette_from_stored(UI_PAL_TAG + 0u) == UI_GREY_INDEX && !strcmp(UI_PALETTES[UI_GREY_INDEX].name, "GREY"));
-        assert(UI_BW_INDEX == NPALETTES - 1u && !strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
-               palette_from_stored(UI_PAL_TAG + UI_BW_INDEX) == UI_BW_INDEX && palette_stored_ok(UI_PAL_TAG + UI_BW_INDEX));
+        for (uint32_t i = 0; i < NPALETTES; i++) assert(palette_from_stored(UI_PAL_TAG + i) == UI_VENOM_INDEX);
+        assert(palette_from_stored(40) == UI_VENOM_INDEX && !palette_stored_ok(40) && palette_stored_ok(3) &&
+               palette_stored_ok(UI_PAL_TAG + 0u) && palette_stored_ok(palette_to_stored(UI_GREY_INDEX)));
+        assert(!strcmp(UI_PALETTES[UI_GREY_INDEX].name, "GREY") && !strcmp(UI_PALETTES[UI_VENOM_INDEX].name, "VENOM"));
+        assert(!strcmp(UI_PALETTES[UI_BW_INDEX].name, "MONO") &&
+               palette_from_stored(palette_to_stored(UI_BW_INDEX)) == UI_BW_INDEX);
         q.palette = palette_to_stored(5);
         assert(settings_import(&q, sizeof q) == 1 && settings.palette == 5u);
+        q.palette = UI_PAL_TAG + UI_GREY_INDEX;                  /* stock Felucca's saved GREY: VENOM here */
+        assert(settings_import(&q, sizeof q) == 1 && settings.palette == UI_VENOM_INDEX);
         settings.magic = SETTINGS_MAGIC_OLD; settings.palette = 13; settings_init();   /* retained SET3 */
-        assert(settings.magic == SETTINGS_MAGIC && settings.palette == 6u);
+        assert(settings.magic == SETTINGS_MAGIC && settings.palette == UI_VENOM_INDEX);
+        settings.magic = 0; settings_init();                     /* no settings at all: VENOM */
+        assert(settings.palette == UI_VENOM_INDEX);
         p = original; assert(settings_import(&p, sizeof p) == 1); settings_init();
     }
 #ifdef FELUCCA_FAVORITES
